@@ -151,34 +151,51 @@
         return clean.replace(/(\d{4}-\d{2}-\d{2})/g, "\n\n$1\n").trim();
     }
 
-    async function load() {
+async function load() {
         for (const f of feeds) {
             try {
-                // 使用 AllOrigins 代理繞過 CORS 並加上時間戳防止緩存
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(f.url)}&_=${Date.now()}`;
-                const res = await fetch(proxyUrl);
+                // 加強防緩存：
+                // 1. 在 URL 加入隨機數防止代理緩存
+                // 2. 在 Fetch 加入 cache: "no-cache" 防止瀏覽器緩存
+                const cacheBuster = `nocache=${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                const finalUrl = f.url + (f.url.includes('?') ? '&' : '?') + cacheBuster;
+                
+                // 使用 AllOrigins 代理，並確保請求不被緩存
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`;
+                
+                const res = await fetch(proxyUrl, {
+                    method: 'GET',
+                    cache: 'no-cache', // 強制瀏覽器向伺服器發送請求
+                    headers: {
+                        'Pragma': 'no-cache',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
                 const xmlText = await res.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // 檢查是否成功獲取 XML 內容
                 const items = xmlDoc.querySelectorAll("item");
-
-                if (items.length === 0) continue;
+                if (items.length === 0) {
+                    console.warn(`${f.id} 未能抓取到有效內容，可能是代理延遲`);
+                    continue;
+                }
 
                 if (f.id === "traffic") {
                     trafficDataList = Array.from(items).map(i => ({
                         title: i.querySelector("title").textContent,
-                        date: (i.querySelector("pubDate").textContent || "").split(' ')[4] || "" // 獲取時間部分
+                        date: (i.querySelector("pubDate").textContent || "").split(' ')[4] || ""
                     }));
-                    document.getElementById('traffic-marquee').innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`;
-                    document.getElementById('traffic-marquee').style.opacity = "1";
-                    document.getElementById('traffic-marquee').style.transform = "translateY(0)";
+                    const el = document.getElementById('traffic-marquee');
+                    el.innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`;
                 } else if (f.id === "news") {
                     newsDataList = Array.from(items).map(i => ({
                         title: i.querySelector("title").textContent
                     }));
-                    document.getElementById('news-marquee').innerText = newsDataList[0].title;
-                    document.getElementById('news-marquee').style.opacity = "1";
-                    document.getElementById('news-marquee').style.transform = "translateY(0)";
+                    const el = document.getElementById('news-marquee');
+                    el.innerText = newsDataList[0].title;
                 } else if (f.id === "actual") {
                     document.getElementById('actual-mini').innerHTML = parseActual(items[0]);
                 } else {
@@ -186,10 +203,23 @@
                     const pubDate = items[0].querySelector("pubDate").textContent;
                     const content = processContent(f.id, desc);
                     const box = document.getElementById(`${f.id}-box`);
-                    box.innerHTML = `<div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div><div class="content">${content}</div><div class="time">🕒 ${pubDate}</div>`;
-                    (f.id === "warning" && content !== "現時沒有天氣警告") ? box.classList.add("alert-active") : box.classList.remove("alert-active");
+                    
+                    // 更新時間顯示以觀察是否有變化
+                    box.innerHTML = `
+                        <div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div>
+                        <div class="content">${content}</div>
+                        <div class="time">🕒 ${pubDate} (已更新)</div>
+                    `;
+                    
+                    if (f.id === "warning" && content !== "現時沒有天氣警告") {
+                        box.classList.add("alert-active");
+                    } else {
+                        box.classList.remove("alert-active");
+                    }
                 }
-            } catch (e) { console.error(`${f.id} 獲取失敗`, e); }
+            } catch (e) { 
+                console.error(`${f.id} 獲取失敗`, e); 
+            }
         }
     }
 
