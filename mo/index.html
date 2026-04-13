@@ -152,76 +152,60 @@
     }
 
 async function load() {
-        for (const f of feeds) {
-            try {
-                // 加強防緩存：
-                // 1. 在 URL 加入隨機數防止代理緩存
-                // 2. 在 Fetch 加入 cache: "no-cache" 防止瀏覽器緩存
-                const cacheBuster = `nocache=${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                const finalUrl = f.url + (f.url.includes('?') ? '&' : '?') + cacheBuster;
-                
-                // 使用 AllOrigins 代理，並確保請求不被緩存
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`;
-                
-                const res = await fetch(proxyUrl, {
-                    method: 'GET',
-                    cache: 'no-cache', // 強制瀏覽器向伺服器發送請求
-                    headers: {
-                        'Pragma': 'no-cache',
-                        'Cache-Control': 'no-cache'
-                    }
-                });
+    // 這裡替換成你剛剛在 Google 部署後得到的網址
+    const myGasUrl = "https://script.google.com/macros/s/AKfycbzgQYauGB2igGh44n3AcgA4ZzHkrkPL0yDAZuRtcNb-ikgwAtuZeCsGQz2h2J42l-dB/exec"; 
 
-                const xmlText = await res.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-                
-                // 檢查是否成功獲取 XML 內容
-                const items = xmlDoc.querySelectorAll("item");
-                if (items.length === 0) {
-                    console.warn(`${f.id} 未能抓取到有效內容，可能是代理延遲`);
-                    continue;
-                }
+    for (const f of feeds) {
+        try {
+            // 直接請求你的 Google 轉發器，它會幫你抓取 100% 實時的資料
+            const finalUrl = `${myGasUrl}?url=${encodeURIComponent(f.url)}`;
+            
+            const res = await fetch(finalUrl, { cache: "no-store" });
+            const xmlText = await res.text();
+            
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const items = xmlDoc.querySelectorAll("item");
 
-                if (f.id === "traffic") {
-                    trafficDataList = Array.from(items).map(i => ({
-                        title: i.querySelector("title").textContent,
-                        date: (i.querySelector("pubDate").textContent || "").split(' ')[4] || ""
-                    }));
-                    const el = document.getElementById('traffic-marquee');
-                    el.innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`;
-                } else if (f.id === "news") {
-                    newsDataList = Array.from(items).map(i => ({
-                        title: i.querySelector("title").textContent
-                    }));
-                    const el = document.getElementById('news-marquee');
-                    el.innerText = newsDataList[0].title;
-                } else if (f.id === "actual") {
-                    document.getElementById('actual-mini').innerHTML = parseActual(items[0]);
+            if (items.length === 0) continue;
+
+            if (f.id === "traffic") {
+                trafficDataList = Array.from(items).map(i => ({
+                    title: i.querySelector("title").textContent,
+                    date: (i.querySelector("pubDate").textContent || "").split(' ')[4] || ""
+                }));
+                // 強制即時更新畫面
+                document.getElementById('traffic-marquee').innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`;
+            } else if (f.id === "news") {
+                newsDataList = Array.from(items).map(i => ({
+                    title: i.querySelector("title").textContent
+                }));
+                document.getElementById('news-marquee').innerText = newsDataList[0].title;
+            } else if (f.id === "actual") {
+                document.getElementById('actual-mini').innerHTML = parseActual(items[0]);
+            } else {
+                const desc = items[0].querySelector("description").textContent;
+                const pubDate = items[0].querySelector("pubDate").textContent;
+                const content = processContent(f.id, desc);
+                const box = document.getElementById(`${f.id}-box`);
+                
+                box.innerHTML = `
+                    <div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div>
+                    <div class="content">${content}</div>
+                    <div class="time">🕒 ${pubDate} <span style="color:#7ee787;">[實時]</span></div>
+                `;
+                
+                if (f.id === "warning" && content !== "現時沒有天氣警告") {
+                    box.classList.add("alert-active");
                 } else {
-                    const desc = items[0].querySelector("description").textContent;
-                    const pubDate = items[0].querySelector("pubDate").textContent;
-                    const content = processContent(f.id, desc);
-                    const box = document.getElementById(`${f.id}-box`);
-                    
-                    // 更新時間顯示以觀察是否有變化
-                    box.innerHTML = `
-                        <div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div>
-                        <div class="content">${content}</div>
-                        <div class="time">🕒 ${pubDate} (已更新)</div>
-                    `;
-                    
-                    if (f.id === "warning" && content !== "現時沒有天氣警告") {
-                        box.classList.add("alert-active");
-                    } else {
-                        box.classList.remove("alert-active");
-                    }
+                    box.classList.remove("alert-active");
                 }
-            } catch (e) { 
-                console.error(`${f.id} 獲取失敗`, e); 
             }
+        } catch (e) { 
+            console.error(`${f.id} 更新失敗`, e); 
         }
     }
+}
 
     function rotateList(list, elementId, currentIndexObj) {
         if (!list.length) return;
