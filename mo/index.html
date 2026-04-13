@@ -3,82 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>澳門監控面板 - 完整功能實時版</title>
+    <title>澳門監控面板 - 實時修復版</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 1. 基礎樣式與響應式字體 */
-        html, body { 
-            height: 100%; margin: 0; padding: 0; 
-            background: #0d1117; color: #c9d1d9;
-            font-family: "PingFang HK", "Microsoft JhengHei", sans-serif;
-            font-size: clamp(16px, 1.2vw + 12px, 24px); 
-            overflow: hidden; 
-        }
-
+        /* 核心樣式 */
+        html, body { height: 100%; margin: 0; padding: 0; background: #0d1117; color: #c9d1d9; font-family: "PingFang HK", sans-serif; font-size: clamp(16px, 1.2vw + 12px, 24px); overflow: hidden; }
         body { display: flex; flex-direction: column; padding: 15px; box-sizing: border-box; }
         header { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px 15px 5px; flex-shrink: 0; }
-        h1 { margin: 0; font-size: 1.4rem; color: #58a6ff; letter-spacing: 1px; }
+        h1 { margin: 0; font-size: 1.4rem; color: #58a6ff; }
         
         #actual-mini {
-            display: flex; gap: 20px; background: rgba(88, 166, 255, 0.12);
-            padding: 5px 20px; border-radius: 40px; border: 1px solid rgba(88, 166, 255, 0.3);
-            font-family: "Consolas", monospace; font-size: 1.1rem; color: #f0f6fc; font-weight: 600; 
-            align-items: center;
+            display: flex; gap: 15px; background: rgba(88, 166, 255, 0.12);
+            padding: 8px 20px; border-radius: 40px; border: 1px solid rgba(88, 166, 255, 0.3);
+            font-size: 1.1rem; color: #f0f6fc; align-items: center;
         }
-        #actual-mini img { height: 45px; width: auto; margin: 0 -5px; vertical-align: middle; }
+        #actual-mini img { height: 45px; width: auto; margin: 0 -5px; }
 
-        /* 2. 滾動條樣式 */
-        .marquee-container {
-            border: 1px solid #30363d; margin-bottom: 10px; height: 50px; 
-            overflow: hidden; display: flex; align-items: center; flex-shrink: 0;
-            background: #1c232d;
-        }
-        .marquee-label {
-            color: #0d1117; padding: 0 15px; font-weight: bold;
-            font-size: 0.9rem; z-index: 5; height: 100%; display: flex; align-items: center; min-width: 110px;
-        }
+        .marquee-container { border: 1px solid #30363d; margin-bottom: 10px; height: 50px; overflow: hidden; display: flex; align-items: center; background: #1c232d; flex-shrink: 0; }
+        .marquee-label { color: #0d1117; padding: 0 15px; font-weight: bold; font-size: 0.9rem; min-width: 110px; height: 100%; display: flex; align-items: center; }
         .marquee-stage { flex-grow: 1; height: 100%; position: relative; }
-        .marquee-text {
-            position: absolute; width: 100%; padding: 0 15px;
-            font-size: 1rem; font-weight: 500; white-space: nowrap; overflow: hidden;
-            text-overflow: ellipsis; opacity: 1; transform: translateY(0); line-height: 50px;
-            transition: all 0.6s ease;
-        }
+        .marquee-text { position: absolute; width: 100%; padding: 0 15px; font-size: 1rem; line-height: 50px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.6s; }
 
-        .traffic-bar { border-left: 5px solid #f2c94c; }
-        .traffic-bar .marquee-label { background: #f2c94c; }
-        .news-bar { border-left: 5px solid #d73a49; }
-        .news-bar .marquee-label { background: #d73a49; color: #fff; }
+        .traffic-bar { border-left: 5px solid #f2c94c; } .traffic-bar .marquee-label { background: #f2c94c; }
+        .news-bar { border-left: 5px solid #d73a49; } .news-bar .marquee-label { background: #d73a49; color: #fff; }
 
-        /* 3. 佈局格線 */
         .grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 15px; flex-grow: 1; min-height: 0; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; overflow: hidden; border-top: 4px solid #30363d; }
         
-        @media (max-width: 1200px) { .grid { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 768px) {
-            html, body { overflow-y: auto; height: auto; }
-            .grid { grid-template-columns: 1fr; display: flex; flex-direction: column; }
-            header { flex-direction: column; gap: 10px; }
-        }
-
-        .card { 
-            background: #161b22; border: 1px solid #30363d; border-radius: 10px; 
-            padding: 15px; display: flex; flex-direction: column; min-height: 0;
-        }
-        .alert-active { background: #ffffff !important; border: 4px solid #d73a49 !important; animation: pulse-border 2s infinite; }
+        .card-forecast { border-top-color: #79c0ff; }
+        .card-warning { border-top-color: #f8e3a1; }
+        .card-seven { border-top-color: #7ee787; }
+        
+        .alert-active { background: #ffffff !important; border: 4px solid #d73a49 !important; animation: pulse 2s infinite; }
         .alert-active h2, .alert-active .content { color: #d73a49 !important; font-weight: bold; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(215, 58, 73, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(215, 58, 73, 0); } 100% { box-shadow: 0 0 0 0 rgba(215, 58, 73, 0); } }
 
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(215, 58, 73, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(215, 58, 73, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(215, 58, 73, 0); }
-        }
-
-        .card-forecast { border-top: 4px solid #79c0ff; }
-        .card-warning  { border-top: 4px solid #f8e3a1; }
-        .card-seven    { border-top: 4px solid #7ee787; }
-
-        .card-header { display: flex; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #30363d; flex-shrink: 0; }
-        .card-header h2 { font-size: 1.1rem; margin: 0; color: #f0f6fc; }
+        .card-header { border-bottom: 1px solid #30363d; padding-bottom: 8px; margin-bottom: 10px; flex-shrink: 0; }
+        .card-header h2 { font-size: 1.1rem; margin: 0; }
         .content { font-size: 0.95rem; line-height: 1.6; overflow-y: auto; white-space: pre-wrap; flex-grow: 1; color: #d1d5db; }
         .time { font-size: 0.8rem; color: #8b949e; margin-top: 10px; text-align: right; }
     </style>
@@ -86,28 +47,27 @@
 <body>
 
     <header>
-        <h1 id="main-title"><i class="fa-solid fa-tower-broadcast"></i> 澳門資訊監控</h1>
-        <div id="actual-mini">讀取中...</div>
+        <h1><i class="fa-solid fa-tower-broadcast"></i> 澳門資訊監控</h1>
+        <div id="actual-mini">載入中...</div>
     </header>
 
     <div class="marquee-container traffic-bar">
-        <div class="marquee-label"><i class="fa-solid fa-car"></i> 交通消息</div>
+        <div class="marquee-label">交通消息</div>
         <div class="marquee-stage"><div id="traffic-marquee" class="marquee-text">同步中...</div></div>
     </div>
 
     <div class="marquee-container news-bar">
-        <div class="marquee-label"><i class="fa-solid fa-newspaper"></i> 澳廣視新聞</div>
+        <div class="marquee-label">澳廣視新聞</div>
         <div class="marquee-stage"><div id="news-marquee" class="marquee-text">同步中...</div></div>
     </div>
 
-    <div id="board" class="grid">
+    <div class="grid">
         <div class="card card-forecast" id="forecast-box"></div>
         <div class="card card-warning" id="warning-box"></div>
         <div class="card card-seven" id="seven-box"></div>
     </div>
 
 <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzgQYauGB2igGh44n3AcgA4ZzHkrkPL0yDAZuRtcNb-ikgwAtuZeCsGQz2h2J42l-dB/exec"; 
     const feeds = [
         { id: "actual", url: "https://rss.smg.gov.mo/c_ActualWeather_rss.xml" },
         { id: "forecast", name: "天氣預測", url: "https://rss.smg.gov.mo/c_WForecast_rss.xml", icon: "fa-cloud-sun" },
@@ -123,19 +83,19 @@
     // 特定字詞刪除與隔行功能
     function processContent(id, text) {
         let clean = text.replace(/<[^>]*>/g, '').trim();
-        // 刪除特定標籤字詞
         clean = clean.replace(/(警告類型|最近更新時間|內容)\s*(：|:)?/g, "").trim();
-        // 數字範圍符號美化
         clean = clean.replace(/(\d+)\s*至\s*(\d+)/g, "$1 - $2");
         
         if (id === "warning") {
             const result = clean.replace(/沒有(熱帶氣旋|暴雨|季候風|雷暴|風暴潮|海嘯).*\n?/g, "").trim();
             return result === "" ? "現時沒有天氣警告" : result;
         }
-        // 七日預測隔行處理：將日期前加上換行
-        return clean.replace(/(\d{4}-\d{2}-\d{2})/g, "\n\n$1\n").trim();
+        // 七日預測隔行：YYYY-MM-DD 前換行
+        if (id === "seven") return clean.replace(/(\d{4}-\d{2}-\d{2})/g, "\n\n$1\n").trim();
+        return clean;
     }
 
+    // 實時天氣與圖示提取
     function parseActual(item) {
         const desc = item.querySelector("description").textContent;
         const iconMatch = desc.match(/ww-[a-zA-Z0-9]+\.gif/);
@@ -158,13 +118,13 @@
     }
 
     async function load() {
-        console.log("正在同步最新數據...");
         for (const f of feeds) {
             try {
-                const buster = `v=${Date.now()}_${Math.random().toString(36).substring(7)}`;
-                const finalUrl = `${GAS_URL}?url=${encodeURIComponent(f.url)}&${buster}`;
+                // 使用 AllOrigins 繞過緩存
+                const targetUrl = f.url + (f.url.includes('?') ? '&' : '?') + "nocache=" + Date.now();
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
                 
-                const res = await fetch(finalUrl, { cache: "no-store" });
+                const res = await fetch(proxyUrl, { cache: "no-store" });
                 const xmlText = await res.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(xmlText, "text/xml");
@@ -177,12 +137,8 @@
                         title: i.querySelector("title").textContent,
                         date: (i.querySelector("pubDate").textContent || "").split(' ')[4] || ""
                     }));
-                    document.getElementById('traffic-marquee').innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`;
                 } else if (f.id === "news") {
-                    newsDataList = Array.from(items).map(i => ({
-                        title: i.querySelector("title").textContent
-                    }));
-                    document.getElementById('news-marquee').innerText = newsDataList[0].title;
+                    newsDataList = Array.from(items).map(i => ({ title: i.querySelector("title").textContent }));
                 } else if (f.id === "actual") {
                     document.getElementById('actual-mini').innerHTML = parseActual(items[0]);
                 } else {
@@ -197,34 +153,29 @@
                     `;
                     (f.id === "warning" && content !== "現時沒有天氣警告") ? box.classList.add("alert-active") : box.classList.remove("alert-active");
                 }
-            } catch (e) { console.error(`${f.id} 失敗`, e); }
+            } catch (e) { console.error(e); }
         }
     }
 
     function rotateList(list, elementId, currentIndexObj) {
         if (!list.length) return;
         const el = document.getElementById(elementId);
-        el.style.opacity = "0"; 
-        el.style.transform = "translateY(-20px)";
+        el.style.opacity = "0"; el.style.transform = "translateY(-15px)";
         setTimeout(() => {
             currentIndexObj.index = (currentIndexObj.index + 1) % list.length;
             const item = list[currentIndexObj.index];
             el.innerText = (elementId === 'news-marquee') ? item.title : `${item.title} ${item.date}`;
-            el.style.transform = "translateY(20px)";
-            setTimeout(() => { 
-                el.style.opacity = "1"; 
-                el.style.transform = "translateY(0)"; 
-            }, 50);
+            el.style.transform = "translateY(15px)";
+            setTimeout(() => { el.style.opacity = "1"; el.style.transform = "translateY(0)"; }, 50);
         }, 600);
     }
 
-    window.onload = () => {
-        load();
-        setInterval(load, 60000);
-        const tCounter = { index: 0 }, nCounter = { index: 0 };
-        setInterval(() => rotateList(trafficDataList, 'traffic-marquee', tCounter), 12000);
-        setTimeout(() => setInterval(() => rotateList(newsDataList, 'news-marquee', nCounter), 12000), 6000);
-    };
+    // 啟動
+    load();
+    setInterval(load, 60000);
+    const tCounter = { index: 0 }, nCounter = { index: 0 };
+    setInterval(() => rotateList(trafficDataList, 'traffic-marquee', tCounter), 10000);
+    setTimeout(() => setInterval(() => rotateList(newsDataList, 'news-marquee', nCounter), 10000), 5000);
 </script>
 </body>
 </html>
