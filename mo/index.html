@@ -11,7 +11,6 @@
             height: 100%; margin: 0; padding: 0; 
             background: #0d1117; color: #c9d1d9;
             font-family: "PingFang HK", "Microsoft JhengHei", sans-serif;
-            /* 使用 clamp 讓字體在 16px 到 24px 之間隨寬度動態調整 */
             font-size: clamp(16px, 1.2vw + 12px, 24px); 
             overflow: hidden; 
         }
@@ -22,11 +21,18 @@
         
         #actual-mini {
             display: flex; gap: 20px; background: rgba(88, 166, 255, 0.12);
-            padding: 10px 20px; border-radius: 40px; border: 1px solid rgba(88, 166, 255, 0.3);
+            padding: 5px 20px; border-radius: 40px; border: 1px solid rgba(88, 166, 255, 0.3);
             font-family: "Consolas", monospace; font-size: 1.1rem; color: #f0f6fc; font-weight: 600; 
+            align-items: center;
         }
 
-        /* 滾動條樣式 */
+        /* 天氣圖示樣式 */
+        #actual-mini img {
+            height: 40px; /* 調整圖示高度以配合文字 */
+            width: auto;
+            margin-right: -5px;
+        }
+
         .marquee-container {
             border: 1px solid #30363d; margin-bottom: 10px; height: 50px; 
             overflow: hidden; display: flex; align-items: center; flex-shrink: 0;
@@ -50,15 +56,12 @@
         .news-bar .marquee-label { background: #d73a49; color: #ffffff; }
         #news-marquee { color: #ff7b72; }
 
-        /* 佈局容器 */
         .grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 15px; flex-grow: 1; min-height: 0; }
         
-        /* 進階建議：針對中型屏幕（如平板）改為兩欄 */
         @media (max-width: 1200px) {
             .grid { grid-template-columns: 1fr 1fr; }
         }
 
-        /* 進階建議：針對小屏幕（如手機）改為單欄並允許捲動 */
         @media (max-width: 768px) {
             html, body { overflow-y: auto; height: auto; }
             body { padding: 10px; }
@@ -127,16 +130,34 @@
     const windMap = { "北": "N", "東北": "NE", "東": "E", "東南": "SE", "南": "S", "西南": "SW", "西": "W", "西北": "NW" };
     let trafficDataList = [], newsDataList = [];
 
-    function parseActual(text) {
-        const clean = text.replace(/<[^>]*>/g, '').replace(/：/g, ':');
+    function parseActual(description) {
+        // 1. 提取圖片標籤
+        const imgMatch = description.match(/<img[^>]+src="([^">]+)"[^>]*>/);
+        const iconHtml = imgMatch ? imgMatch[0] : "";
+
+        // 2. 清理其餘文字獲取數據
+        const clean = description.replace(/<[^>]*>/g, '').replace(/：/g, ':');
         const getVal = (label) => {
             const reg = new RegExp(`${label}:\\s*([^\\n\\s°%km/h度]+)`);
             const match = clean.match(reg);
             return match ? match[1].trim() : '--';
         };
-        return `<span>T: ${getVal('溫度')}℃</span><span>H: ${getVal('濕度')}%</span><span>W: ${windMap[getVal('風向')] || ''} ${getVal('風速')}km/h</span>`;
+
+        const temp = getVal('溫度');
+        const humi = getVal('濕度');
+        const windDir = windMap[getVal('風向')] || '';
+        const windSpeed = getVal('風速');
+
+        // 3. 按照要求排列：溫度 -> 圖示 -> 濕度 -> 風速
+        return `
+            <span><i class="fa-solid fa-thermometer"></i> ${temp}℃</span>
+            ${iconHtml}
+            <span><i class="fa-solid fa-droplet"></i> ${humi}%</span>
+            <span><i class="fa-solid fa-wind"></i> ${windDir} ${windSpeed}km/h</span>
+        `;
     }
 
+    // processContent 和 rotateList 函數保持不變...
     function processContent(id, text) {
         let clean = text.replace(/<[^>]*>/g, '').trim();
         clean = clean.replace(/(警告類型|最近更新時間|內容)\s*(：|:)?/g, "").trim();
@@ -155,7 +176,6 @@
         setTimeout(() => {
             currentIndexObj.index = (currentIndexObj.index + 1) % list.length;
             const item = list[currentIndexObj.index];
-            // 新聞標題不顯示時間，交通顯示時間
             el.innerText = (elementId === 'news-marquee') ? item.title : `${item.title} ${item.date}`;
             el.style.transform = "translateY(40px)";
             setTimeout(() => { el.style.opacity = "1"; el.style.transform = "translateY(0px)"; }, 50);
@@ -180,6 +200,7 @@
                     const el = document.getElementById('news-marquee');
                     if (el.innerText.includes("中")) { el.innerText = newsDataList[0].title; el.style.opacity = "1"; el.style.transform = "translateY(0)"; }
                 } else if (f.id === "actual") {
+                    // 傳入 description 以提取圖片
                     document.getElementById('actual-mini').innerHTML = parseActual(first.description);
                 } else {
                     const content = processContent(f.id, first.description);
