@@ -72,15 +72,20 @@
         return clean;
     }
 
-    async function load() {
-        document.getElementById('status-title').innerText = "更新中...";
+async function load() {
+        // 【請填入你重新部署後的 GAS 網址】
+        const myGasUrl = "https://script.google.com/macros/s/AKfycbzgQYauGB2igGh44n3AcgA4ZzHkrkPL0yDAZuRtcNb-ikgwAtuZeCsGQz2h2J42l-dB/exec"; 
+        const now = new Date().toLocaleTimeString();
+        document.getElementById('status-title').innerText = "Google 專線同步中...";
+
         for (const f of feeds) {
             try {
-                const targetUrl = f.url + (f.url.includes('?') ? '&' : '?') + "v=" + Date.now();
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+                // 發送給 GAS 的請求也加上隨機參數，確保連 Google 網址都不被快取
+                const finalApi = `${myGasUrl}?url=${encodeURIComponent(f.url)}&_rand=${Date.now()}`;
                 
-                const res = await fetch(proxyUrl, { cache: "no-store" });
+                const res = await fetch(finalApi, { cache: "no-store" });
                 const xmlText = await res.text();
+                
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(xmlText, "text/xml");
                 const item = xmlDoc.querySelector("item");
@@ -90,7 +95,7 @@
                 if (f.id === "actual") {
                     const desc = item.querySelector("description").textContent;
                     const icon = desc.match(/ww-[a-zA-Z0-9]+\.gif/);
-                    const img = icon ? `<img src="https://www.smg.gov.mo/icons/weatherIcon/${icon[0]}">` : "";
+                    const img = icon ? `<img src="https://www.smg.gov.mo/icons/weatherIcon/${icon[0]}?v=${Date.now()}">` : "";
                     document.getElementById('actual-mini').innerHTML = `<span>實時天氣</span> ${img}`;
                 } else if (f.id === "traffic") {
                     trafficDataList = Array.from(xmlDoc.querySelectorAll("item")).map(i => ({
@@ -103,9 +108,22 @@
                     }));
                 } else {
                     const box = document.getElementById(`${f.id}-box`);
-                    box.innerHTML = `<div class="card-header"><h2>${f.name}</h2></div><div class="content">${processContent(f.id, item.querySelector("description").textContent)}</div><div class="time">${item.querySelector("pubDate").textContent}</div>`;
+                    const content = processContent(f.id, item.querySelector("description").textContent);
+                    const pubDate = item.querySelector("pubDate")?.textContent || "";
+                    
+                    box.innerHTML = `
+                        <div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div>
+                        <div class="content">${content}</div>
+                        <div class="time">
+                            🕒 數據發布: ${pubDate}<br>
+                            <span style="color:#58a6ff">🚀 Google 專線更新於: ${now}</span>
+                        </div>
+                    `;
+                    (f.id === "warning" && content !== "現時沒有天氣警告") ? box.classList.add("alert-active") : box.classList.remove("alert-active");
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(`[${f.id}] GAS 請求失敗:`, e); 
+            }
         }
         document.getElementById('status-title').innerText = "澳門資訊監控";
     }
