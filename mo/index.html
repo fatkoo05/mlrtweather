@@ -130,14 +130,30 @@
     const windMap = { "北": "N", "東北": "NE", "東": "E", "東南": "SE", "南": "S", "西南": "SW", "西": "W", "西北": "NW" };
     let trafficDataList = [], newsDataList = [];
 
-function parseActual(description) {
-        // 1. 使用更寬鬆的正則表達式提取 src 網址
-        const srcMatch = description.match(/src="([^">]+)"/);
-        const imgSrc = srcMatch ? srcMatch[1] : "";
-        const iconHtml = imgSrc ? `<img src="${imgSrc}" referrerpolicy="no-referrer">` : "";
+function parseActual(item) {
+        // 嘗試從多個地方獲取圖片網址
+        let imgSrc = "";
+        
+        // 1. 嘗試從 description 匹配
+        const desc = item.description || "";
+        const srcMatch = desc.match(/src="([^">]+)"/);
+        
+        if (srcMatch) {
+            imgSrc = srcMatch[1];
+        } else if (item.enclosure && item.enclosure.link) {
+            // 2. 嘗試從 enclosure 獲取
+            imgSrc = item.enclosure.link;
+        }
 
-        // 2. 清理文字獲取數據
-        const clean = description.replace(/<[^>]*>/g, '').replace(/：/g, ':');
+        // 補全相對路徑 (如果圖片網址是以 /icons 開頭)
+        if (imgSrc && imgSrc.startsWith('/')) {
+            imgSrc = "https://www.smg.gov.mo" + imgSrc;
+        }
+
+        const iconHtml = imgSrc ? `<img src="${imgSrc}" referrerpolicy="no-referrer" style="height:40px; vertical-align:middle;">` : "";
+
+        // 清理文字數據
+        const clean = desc.replace(/<[^>]*>/g, '').replace(/：/g, ':');
         const getVal = (label) => {
             const reg = new RegExp(`${label}:\\s*([^\\n\\s°%km/h度]+)`);
             const match = clean.match(reg);
@@ -149,13 +165,43 @@ function parseActual(description) {
         const windDir = windMap[getVal('風向')] || getVal('風向');
         const windSpeed = getVal('風速');
 
-        // 3. 組合回傳（確保圖片在濕度左側）
         return `
             <span><i class="fa-solid fa-thermometer"></i> ${temp}℃</span>
             ${iconHtml}
             <span><i class="fa-solid fa-droplet"></i> ${humi}%</span>
             <span><i class="fa-solid fa-wind"></i> ${windDir} ${windSpeed}km/h</span>
         `;
+    }
+
+    async function load() {
+        for (const f of feeds) {
+            try {
+                // 修改 API 地址，加入 include_enclosure=true
+                const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(f.url)}&include_enclosure=true&_=${Date.now()}`;
+                const res = await fetch(api);
+                const data = await res.json();
+                if (data.status !== 'ok' || !data.items.length) continue;
+                
+                const first = data.items[0];
+                if (f.id === "traffic") {
+                    trafficDataList = data.items.map(i => ({ title: i.title, date: i.pubDate.split(' ')[1] || "" }));
+                    const el = document.getElementById('traffic-marquee');
+                    if (el.innerText.includes("中")) { el.innerText = `${trafficDataList[0].title} ${trafficDataList[0].date}`; el.style.opacity = "1"; el.style.transform = "translateY(0)"; }
+                } else if (f.id === "news") {
+                    newsDataList = data.items.map(i => ({ title: i.title }));
+                    const el = document.getElementById('news-marquee');
+                    if (el.innerText.includes("中")) { el.innerText = newsDataList[0].title; el.style.opacity = "1"; el.style.transform = "translateY(0)"; }
+                } else if (f.id === "actual") {
+                    // 傳入整個 item 對象而不是只有 description
+                    document.getElementById('actual-mini').innerHTML = parseActual(first);
+                } else {
+                    const content = processContent(f.id, first.description);
+                    const box = document.getElementById(`${f.id}-box`);
+                    box.innerHTML = `<div class="card-header"><h2><i class="fa-solid ${f.icon}"></i> ${f.name}</h2></div><div class="content">${content}</div><div class="time">🕒 ${first.pubDate}</div>`;
+                    (f.id === "warning" && content !== "現時沒有天氣警告") ? box.classList.add("alert-active") : box.classList.remove("alert-active");
+                }
+            } catch (e) { console.error(e); }
+        }
     }
 
     // processContent 和 rotateList 函數保持不變...
