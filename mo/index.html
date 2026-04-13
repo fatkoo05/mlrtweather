@@ -130,12 +130,13 @@
     const windMap = { "北": "N", "東北": "NE", "東": "E", "東南": "SE", "南": "S", "西南": "SW", "西": "W", "西北": "NW" };
     let trafficDataList = [], newsDataList = [];
 
-    function parseActual(description) {
-        // 1. 提取圖片標籤
-        const imgMatch = description.match(/<img[^>]+src="([^">]+)"[^>]*>/);
-        const iconHtml = imgMatch ? imgMatch[0] : "";
+function parseActual(description) {
+        // 1. 使用更寬鬆的正則表達式提取 src 網址
+        const srcMatch = description.match(/src="([^">]+)"/);
+        const imgSrc = srcMatch ? srcMatch[1] : "";
+        const iconHtml = imgSrc ? `<img src="${imgSrc}" referrerpolicy="no-referrer">` : "";
 
-        // 2. 清理其餘文字獲取數據
+        // 2. 清理文字獲取數據
         const clean = description.replace(/<[^>]*>/g, '').replace(/：/g, ':');
         const getVal = (label) => {
             const reg = new RegExp(`${label}:\\s*([^\\n\\s°%km/h度]+)`);
@@ -145,10 +146,10 @@
 
         const temp = getVal('溫度');
         const humi = getVal('濕度');
-        const windDir = windMap[getVal('風向')] || '';
+        const windDir = windMap[getVal('風向')] || getVal('風向');
         const windSpeed = getVal('風速');
 
-        // 3. 按照要求排列：溫度 -> 圖示 -> 濕度 -> 風速
+        // 3. 組合回傳（確保圖片在濕度左側）
         return `
             <span><i class="fa-solid fa-thermometer"></i> ${temp}℃</span>
             ${iconHtml}
